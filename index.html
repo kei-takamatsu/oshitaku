@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>こどもおしたくアプリ</title>
+    
+    <!-- アプリとして認識させるための設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="icon" href="https://fonts.gstatic.com/s/i/short-term/release/googlestars/star/default/24px.svg">
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and Babel for running React code in browser -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.9); } 100% { transform: scale(1); } }
+        /* 余白調整 */
+        @supports (padding: env(safe-area-inset-top)) {
+            .safe-area-top { padding-top: env(safe-area-inset-top); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const App = () => {
+            // 指定された最新のタスクリスト
+            const defaultTasks = [
+                // あさのタスク
+                { id: 'm1', text: 'かおをあらう', icon: '💦', time: 'morning', done: false },
+                { id: 'm2', text: 'はみがき', icon: '🪥', time: 'morning', done: false },
+                { id: 'm3', text: 'きがえ', icon: '👕', time: 'morning', done: false },
+                { id: 'm4', text: 'トイレ', icon: '🚽', time: 'morning', done: false },
+                // よるのタスク
+                { id: 'e1', text: 'てあらい・うがい', icon: '🧼', time: 'evening', done: false },
+                { id: 'e2', text: 'おふろ', icon: '🛁', time: 'evening', done: false },
+                { id: 'e3', text: 'はみがき', icon: '🪥', time: 'evening', done: false },
+                { id: 'e4', text: 'トイレ', icon: '🚽', time: 'evening', done: false },
+                { id: 'e5', text: 'しゅくだい', icon: '📚', time: 'evening', done: false },
+                { id: 'e6', text: 'あしたのようい', icon: '🎒', time: 'evening', done: false },
+            ];
+
+            const [tasks, setTasks] = useState([]);
+            const [showConfetti, setShowConfetti] = useState(false);
+            const [activeTab, setActiveTab] = useState('morning');
+            const [isEditMode, setIsEditMode] = useState(false);
+            const [newTaskText, setNewTaskText] = useState('');
+            const [newTaskTime, setNewTaskTime] = useState('morning');
+            const [newTaskIcon, setNewTaskIcon] = useState('✨');
+
+            // 今日のはづけを表示するための計算
+            const dateString = useMemo(() => {
+                const now = new Date();
+                const month = now.getMonth() + 1;
+                const date = now.getDate();
+                const dayNames = ['にち', 'げつ', 'か', 'すい', 'もく', 'きん', 'ど'];
+                const day = dayNames[now.getDay()];
+                return `${month}がつ ${date}にち (${day})`;
+            }, []);
+
+            const iconOptions = ['✨', '💦', '🪥', '👕', '🚽', '🍚', '🧼', '🛁', '🛌', '📚', '🎒', '👟', '✏️', '🍎'];
+
+            useEffect(() => {
+                const savedTasks = localStorage.getItem('kidsTasksV4');
+                const savedDate = localStorage.getItem('taskDateV4');
+                const today = new Date().toDateString();
+
+                if (savedTasks) {
+                    const parsedTasks = JSON.parse(savedTasks);
+                    if (savedDate !== today) {
+                        setTasks(parsedTasks.map(t => ({ ...t, done: false })));
+                        localStorage.setItem('taskDateV4', today);
+                    } else {
+                        setTasks(parsedTasks);
+                    }
+                } else {
+                    setTasks(defaultTasks);
+                    localStorage.setItem('taskDateV4', today);
+                }
+
+                // 時間でおすすめのタブをきめる（5時から15時はあさ）
+                const hour = new Date().getHours();
+                setActiveTab(hour >= 5 && hour < 15 ? 'morning' : 'evening');
+
+                setTimeout(() => window.lucide && window.lucide.createIcons(), 100);
+            }, []);
+
+            useEffect(() => {
+                if (tasks.length > 0) {
+                    localStorage.setItem('kidsTasksV4', JSON.stringify(tasks));
+                }
+                setTimeout(() => window.lucide && window.lucide.createIcons(), 50);
+            }, [tasks, isEditMode, activeTab]);
+
+            const toggleTask = (id) => {
+                if (isEditMode) return;
+                const prevTasks = [...tasks];
+                const newTasks = prevTasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
+                
+                const currentTabTasks = newTasks.filter(t => t.time === activeTab);
+                const prevTabTasks = prevTasks.filter(t => t.time === activeTab);
+                
+                if (currentTabTasks.length > 0 && currentTabTasks.every(t => t.done) && !prevTabTasks.every(t => t.done)) {
+                    setShowConfetti(true);
+                }
+                setTasks(newTasks);
+            };
+
+            const addTask = () => {
+                if (!newTaskText.trim()) return;
+                const newTask = {
+                    id: Date.now().toString(),
+                    text: newTaskText,
+                    icon: newTaskIcon,
+                    time: newTaskTime,
+                    done: false
+                };
+                setTasks([...tasks, newTask]);
+                setNewTaskText('');
+            };
+
+            const deleteTask = (id) => {
+                setTasks(tasks.filter(t => t.id !== id));
+            };
+
+            const resetAll = () => {
+                if (confirm('きょうの「できた」をぜんぶ消してもいい？')) {
+                    setTasks(tasks.map(t => ({ ...t, done: false })));
+                    setShowConfetti(false);
+                }
+            };
+
+            const currentList = tasks.filter(t => t.time === activeTab);
+            const doneCount = currentList.filter(t => t.done).length;
+            const progress = currentList.length > 0 ? Math.round((doneCount / currentList.length) * 100) : 0;
+
+            return (
+                <div className="min-h-screen pb-20">
+                    {/* Header: 日付をセンターに配置 */}
+                    <div className={`p-4 shadow-lg sticky top-0 z-10 rounded-b-3xl transition-colors duration-500 safe-area-top ${activeTab === 'morning' ? 'bg-sky-400' : 'bg-indigo-600'}`}>
+                        <div className="flex flex-col gap-1 mb-2">
+                            <div className="flex justify-between items-center text-white">
+                                <h1 className="text-xl font-bold flex items-center gap-1 shrink-0">
+                                    <i data-lucide="star" className="fill-yellow-300 text-yellow-300 w-5 h-5"></i>
+                                    {isEditMode ? 'せってい' : 'おしたく'}
+                                </h1>
+                                
+                                {/* センターの日付表示 */}
+                                <div className="bg-white/20 px-4 py-1 rounded-full text-sm font-bold whitespace-nowrap">
+                                    {dateString}
+                                </div>
+
+                                <div className="flex gap-2 shrink-0">
+                                    <button onClick={resetAll} className="p-2 rounded-full bg-white/20"><i data-lucide="rotate-ccw" className="w-5 h-5"></i></button>
+                                    <button onClick={() => setIsEditMode(!isEditMode)} className={`p-2 rounded-full ${isEditMode ? 'bg-yellow-400 text-sky-900' : 'bg-white/20'}`}>
+                                        <i data-lucide="settings" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {!isEditMode && (
+                            <>
+                                <div className="bg-white/30 rounded-full h-6 overflow-hidden">
+                                    <div className="bg-yellow-400 h-full transition-all duration-700" style={{ width: `${progress}%` }} />
+                                </div>
+                                <div className="text-center text-white font-bold mt-1 text-sm">
+                                    {activeTab === 'morning' ? 'あさ' : 'よる'} のおしたく：{doneCount} / {currentList.length}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* タブのきりかえ */}
+                    <div className="flex justify-center gap-4 my-4 px-4">
+                        <button onClick={() => setActiveTab('morning')} className={`flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 border-2 ${activeTab === 'morning' ? 'bg-orange-100 border-orange-400 text-orange-600 font-bold' : 'bg-white border-transparent text-gray-400'}`}>
+                            <i data-lucide="sun"></i> あさ
+                        </button>
+                        <button onClick={() => setActiveTab('evening')} className={`flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 border-2 ${activeTab === 'evening' ? 'bg-indigo-100 border-indigo-400 text-indigo-600 font-bold' : 'bg-white border-transparent text-gray-400'}`}>
+                            <i data-lucide="moon"></i> よる
+                        </button>
+                    </div>
+
+                    {/* せっていモードの追加フォーム */}
+                    {isEditMode && (
+                        <div className="mx-4 mb-6 p-4 bg-white rounded-3xl border-2 border-dashed border-sky-300 animate-pop">
+                            <h3 className="font-bold text-sky-700 mb-3 flex items-center gap-1"><i data-lucide="plus"></i> タスクを追加</h3>
+                            <input type="text" value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="例：くつをそろえる" className="w-full p-3 rounded-xl border-2 border-gray-100 mb-3 focus:outline-none focus:border-sky-400" />
+                            <div className="flex gap-2 overflow-x-auto mb-3 pb-1">
+                                {iconOptions.map(icon => (
+                                    <button key={icon} onClick={() => setNewTaskIcon(icon)} className={`text-2xl p-2 rounded-lg flex-shrink-0 ${newTaskIcon === icon ? 'bg-sky-100 border-2 border-sky-400' : 'bg-gray-50'}`}>{icon}</button>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => {setNewTaskTime('morning'); addTask();}} className="flex-1 bg-orange-400 text-white font-bold py-3 rounded-xl shadow-sm">あさに追加</button>
+                                <button onClick={() => {setNewTaskTime('evening'); addTask();}} className="flex-1 bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-sm">よるに追加</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* リストひょうじ */}
+                    <div className="px-4 space-y-3 max-w-md mx-auto">
+                        {currentList.map(task => (
+                            <div key={task.id} onClick={() => toggleTask(task.id)} className={`p-4 rounded-3xl flex items-center gap-4 shadow-sm transition-all duration-200 ${task.done ? 'bg-green-100 opacity-70 translate-y-1' : 'bg-white border-b-4 border-gray-200 active:scale-95'}`}>
+                                <div className="text-3xl">{task.icon}</div>
+                                <div className={`flex-1 font-bold text-lg ${task.done ? 'text-green-700 line-through' : 'text-gray-700'}`}>{task.text}</div>
+                                {isEditMode ? (
+                                    <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="p-2 text-red-400 active:text-red-600"><i data-lucide="trash-2"></i></button>
+                                ) : (
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${task.done ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-300'}`}>
+                                        {task.done ? <i data-lucide="check-circle-2"></i> : <i data-lucide="circle"></i>}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        {currentList.length === 0 && (
+                            <div className="text-center py-10 text-gray-400 italic">タスクがありません</div>
+                        )}
+                    </div>
+
+                    {/* ぜんぶできたときのおいわい */}
+                    {showConfetti && (
+                        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6" onClick={() => setShowConfetti(false)}>
+                            <div className="bg-white w-full max-w-xs p-8 rounded-[40px] text-center animate-pop" onClick={e => e.stopPropagation()}>
+                                <i data-lucide="trophy" style={{width:80, height:80}} className="mx-auto text-yellow-400 mb-4"></i>
+                                <h2 className="text-4xl font-black text-sky-600 mb-2">はなまる！</h2>
+                                <p className="text-xl font-bold text-gray-600 mb-6">ぜんぶ できたね！<br/>とっても えらい！</p>
+                                <button onClick={() => setShowConfetti(false)} className="w-full bg-yellow-400 text-white font-black py-4 rounded-full shadow-lg active:scale-95">やったー！</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
