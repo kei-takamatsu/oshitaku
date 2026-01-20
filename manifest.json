@@ -1,0 +1,17 @@
+{
+"name": "こどもおしたくアプリ",
+"short_name": "おしたく",
+"description": "あさ・よるのおしたくをたのしく管理するアプリ",
+"start_url": "./index.html",
+"display": "standalone",
+"background_color": "#F8FAFC",
+"theme_color": "#38BDF8",
+"icons": [
+{
+"src": "https://www.google.com/search?q=https://fonts.gstatic.com/s/i/short-term/release/googlestars/star/default/512px.svg",
+"sizes": "512x512",
+"type": "image/svg+xml",
+"purpose": "any maskable"
+}
+]
+}
