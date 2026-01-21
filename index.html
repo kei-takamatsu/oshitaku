@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>こどもおしたくアプリ</title>
+    <title>おしたくスター</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,7 +15,6 @@
         @keyframes pop { 0% { transform: scale(0.9); } 100% { transform: scale(1); } }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -25,133 +24,151 @@
         const { useState, useEffect, useMemo, useCallback } = React;
 
         const App = () => {
-            const defaultTasks = [
-                { id: 'm1', text: 'かおをあらう', icon: '💦', time: 'morning', done: false },
-                { id: 'm2', text: 'はみがき', icon: '🪥', time: 'morning', done: false },
-                { id: 'm3', text: 'きがえ', icon: '👕', time: 'morning', done: false },
-                { id: 'm4', text: 'トイレ', icon: '🚽', time: 'morning', done: false },
-                { id: 'e1', text: 'てあらい・うがい', icon: '🧼', time: 'evening', done: false },
-                { id: 'e2', text: 'おふろ', icon: '🛁', time: 'evening', done: false },
-                { id: 'e3', text: 'はみがき', icon: '🪥', time: 'evening', done: false },
-                { id: 'e4', text: 'トイレ', icon: '🚽', time: 'evening', done: false },
-                { id: 'e5', text: 'しゅくだい', icon: '📚', time: 'evening', done: false },
-                { id: 'e6', text: 'あしたのようい', icon: '🎒', time: 'evening', done: false },
-            ];
-
+            // --- 状態管理 ---
             const [tasks, setTasks] = useState([]);
             const [history, setHistory] = useState({});
             const [activeTab, setActiveTab] = useState('morning');
-            const [view, setView] = useState('main'); 
+            const [view, setView] = useState('main'); // 'main', 'stats', 'edit'
             const [showConfetti, setShowConfetti] = useState(false);
-            const [editingDate, setEditingDate] = useState(null); // 過去編集用
+            const [editingDate, setEditingDate] = useState(null);
+            
+            // 新規タスク用
+            const [newTaskText, setNewTaskText] = useState('');
+            const [newTaskIcon, setNewTaskIcon] = useState('✨');
+            const iconOptions = ['✨', '💦', '🪥', '👕', '🚽', '🍚', '🧼', '🛁', '🛌', '📚', '🎒', '👟', '✏️', '🍎'];
 
+            // --- 便利関数 ---
             const getTodayStr = () => new Date().toDateString();
             const getTodayKey = () => {
                 const now = new Date();
                 return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             };
-
             const getProperTab = useCallback(() => {
                 const hour = new Date().getHours();
                 return (hour >= 5 && hour < 15) ? 'morning' : 'evening';
             }, []);
 
-            // 初期化
+            // --- 初期データ読み込み ---
             useEffect(() => {
-                const savedTasks = localStorage.getItem('kidsTasksV5');
-                const savedHistory = localStorage.getItem('kidsHistoryV5');
-                const savedDate = localStorage.getItem('taskDateV5');
+                const savedTasks = localStorage.getItem('kidsTasksV6');
+                const savedHistory = localStorage.getItem('kidsHistoryV6');
+                const savedDate = localStorage.getItem('taskDateV6');
                 const todayStr = getTodayStr();
 
                 if (savedTasks) {
                     const parsed = JSON.parse(savedTasks);
                     setTasks(savedDate !== todayStr ? parsed.map(t => ({ ...t, done: false })) : parsed);
                 } else {
-                    setTasks(defaultTasks);
+                    setTasks([
+                        { id: '1', text: 'かおをあらう', icon: '💦', time: 'morning', done: false },
+                        { id: '2', text: 'はみがき', icon: '🪥', time: 'morning', done: false },
+                        { id: '3', text: 'おふろ', icon: '🛁', time: 'evening', done: false },
+                        { id: '4', text: 'しゅくだい', icon: '📚', time: 'evening', done: false }
+                    ]);
                 }
                 if (savedHistory) setHistory(JSON.parse(savedHistory));
-                localStorage.setItem('taskDateV5', todayStr);
+                localStorage.setItem('taskDateV6', todayStr);
                 setActiveTab(getProperTab());
-
-                const timer = setInterval(() => {
-                    const target = getProperTab();
-                    setActiveTab(prev => (prev !== target ? target : prev));
-                }, 60000);
-                return () => clearInterval(timer);
             }, []);
 
-            // 保存
+            // --- 自動更新チェック (1分おき & フォーカス時) ---
+            const refreshAppState = useCallback(() => {
+                const todayStr = getTodayStr();
+                const savedDate = localStorage.getItem('taskDateV6');
+                const targetTab = getProperTab();
+
+                if (savedDate !== todayStr) {
+                    setTasks(prev => prev.map(t => ({ ...t, done: false })));
+                    localStorage.setItem('taskDateV6', todayStr);
+                }
+                setActiveTab(prev => (prev !== targetTab ? targetTab : prev));
+            }, [getProperTab]);
+
+            useEffect(() => {
+                const timer = setInterval(refreshAppState, 60000);
+                window.addEventListener('focus', refreshAppState);
+                return () => {
+                    clearInterval(timer);
+                    window.removeEventListener('focus', refreshAppState);
+                };
+            }, [refreshAppState]);
+
+            // --- 保存処理 ---
             useEffect(() => {
                 if (tasks.length > 0) {
-                    localStorage.setItem('kidsTasksV5', JSON.stringify(tasks));
-                    const done = tasks.filter(t => t.done).length;
-                    const percent = Math.round((done / tasks.length) * 100);
-                    const newHistory = { ...history, [getTodayKey()]: percent };
-                    setHistory(newHistory);
-                    localStorage.setItem('kidsHistoryV5', JSON.stringify(newHistory));
+                    localStorage.setItem('kidsTasksV6', JSON.stringify(tasks));
+                    const currentTabTasks = tasks.filter(t => t.time === activeTab);
+                    if (currentTabTasks.length > 0) {
+                        const done = currentTabTasks.filter(t => t.done).length;
+                        const percent = Math.round((done / currentTabTasks.length) * 100);
+                        // 本日の進捗を履歴に保存（朝夕どちらかの進捗を反映）
+                        const newHistory = { ...history, [getTodayKey()]: percent };
+                        setHistory(newHistory);
+                        localStorage.setItem('kidsHistoryV6', JSON.stringify(newHistory));
+                    }
                 }
             }, [tasks]);
 
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, activeTab, tasks, editingDate]);
 
+            // --- アクション ---
             const toggleTask = (id) => {
                 const newTasks = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
-                if (newTasks.filter(t => t.time === activeTab).every(t => t.done) && 
-                    !tasks.filter(t => t.time === activeTab).every(t => t.done)) {
-                    setShowConfetti(true);
-                }
+                const currentTasks = tasks.filter(t => t.time === activeTab);
+                const isNowComplete = newTasks.filter(t => t.time === activeTab).every(t => t.done);
+                const wasComplete = currentTasks.every(t => t.done);
+                
+                if (isNowComplete && !wasComplete && currentTasks.length > 0) setShowConfetti(true);
                 setTasks(newTasks);
+            };
+
+            const addTask = (time) => {
+                if (!newTaskText.trim()) return;
+                const newTask = { id: Date.now().toString(), text: newTaskText, icon: newTaskIcon, time, done: false };
+                setTasks([...tasks, newTask]);
+                setNewTaskText('');
+            };
+
+            const deleteTask = (id) => {
+                if (confirm('けしても いい？')) setTasks(tasks.filter(t => t.id !== id));
             };
 
             const updateHistoryManually = (dateStr, percent) => {
                 const newHistory = { ...history, [dateStr]: percent };
                 setHistory(newHistory);
-                localStorage.setItem('kidsHistoryV5', JSON.stringify(newHistory));
+                localStorage.setItem('kidsHistoryV6', JSON.stringify(newHistory));
                 setEditingDate(null);
             };
 
-            const stats = useMemo(() => {
-                const items = Object.entries(history);
-                const completedDays = items.filter(([_, v]) => v === 100).length;
-                const avgPercent = items.length > 0 ? Math.round(items.reduce((s, [_, v]) => s + v, 0) / items.length) : 0;
-                return { completedDays, avgPercent };
-            }, [history]);
-
+            // --- コンポーネント: 実績画面 ---
             const StatsView = () => {
                 const now = new Date();
                 const year = now.getFullYear();
                 const month = now.getMonth();
+                const days = new Date(year, month + 1, 0).getDate();
                 const firstDay = new Date(year, month, 1).getDay();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-
+                
                 return (
                     <div className="p-4 space-y-6 animate-pop pb-24">
                         <div className="flex justify-between items-center">
                             <button onClick={() => setView('main')} className="p-2 bg-white rounded-full shadow-md"><i data-lucide="chevron-left"></i></button>
-                            <h2 className="text-xl font-bold text-purple-600 italic">GANBARI-HYO</h2>
+                            <h2 className="text-xl font-bold text-purple-600">がんばりひょう</h2>
                             <div className="w-10"></div>
                         </div>
-
-                        <div className="bg-white rounded-3xl p-5 shadow-sm flex justify-around text-center">
-                            <div><p className="text-[10px] text-slate-400 font-bold uppercase">Average</p><p className="text-2xl font-black text-purple-500">{stats.avgPercent}%</p></div>
-                            <div className="w-px bg-slate-100"></div>
-                            <div><p className="text-[10px] text-slate-400 font-bold uppercase">Perfect</p><p className="text-2xl font-black text-orange-400">{stats.completedDays}日</p></div>
-                        </div>
-
-                        <div className="bg-white rounded-3xl p-5 shadow-sm">
-                            <h3 className="font-bold text-green-600 mb-4 flex items-center gap-1"><i data-lucide="calendar" className="w-4 h-4"></i> カレンダー（タップでなおせるよ）</h3>
+                        <div className="bg-white rounded-3xl p-5 shadow-sm border-b-4 border-green-100">
+                            <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase">Calendar (Tap to Edit)</h3>
                             <div className="calendar-grid">
-                                {['日','月','火','水','木','金','土'].map(d => <div key={d} className="text-center text-[10px] text-slate-300 py-1">{d}</div>)}
+                                {['日','月','火','水','木','金','土'].map(d => <div key={d} className="text-center text-[10px] text-slate-300">{d}</div>)}
                                 {Array(firstDay).fill(null).map((_, i) => <div key={`e-${i}`}></div>)}
-                                {Array(daysInMonth).fill(null).map((_, i) => {
+                                {Array(days).fill(null).map((_, i) => {
                                     const day = i + 1;
-                                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                    const perf = history[dateStr] || 0;
+                                    const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                    const p = history[dStr] || 0;
                                     return (
-                                        <div key={day} onClick={() => setEditingDate({dateStr, day})} className={`aspect-square rounded-xl flex items-center justify-center relative border transition-all active:scale-90 ${dateStr === getTodayKey() ? 'border-purple-400 bg-purple-50' : 'border-slate-50 hover:bg-slate-50'}`}>
-                                            <span className={`text-[10px] ${dateStr === getTodayKey() ? 'text-purple-600 font-bold' : 'text-slate-400'}`}>{day}</span>
-                                            {perf === 100 && <div className="absolute inset-0 flex items-center justify-center text-orange-400 opacity-70 text-lg">💮</div>}
-                                            {perf > 0 && perf < 100 && <div className="absolute bottom-1 w-1 h-1 bg-green-300 rounded-full"></div>}
+                                        <div key={day} onClick={() => setEditingDate({dStr, day})} className="aspect-square rounded-xl flex items-center justify-center relative border border-slate-50 active:scale-90 transition-all">
+                                            <span className="text-[10px] text-slate-400">{day}</span>
+                                            {p === 100 && <div className="absolute inset-0 flex items-center justify-center text-orange-400 text-lg">💮</div>}
+                                            {p > 0 && p < 100 && <div className="absolute bottom-1 w-1 h-1 bg-green-300 rounded-full"></div>}
                                         </div>
                                     );
                                 })}
@@ -166,30 +183,58 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 select-none">
-                    {view === 'stats' ? <StatsView /> : (
+                    {view === 'stats' ? <StatsView /> : view === 'edit' ? (
+                        <div className="p-4 animate-pop pb-24">
+                            <div className="flex justify-between items-center mb-6">
+                                <button onClick={() => setView('main')} className="p-2 bg-white rounded-full shadow-md"><i data-lucide="chevron-left"></i></button>
+                                <h2 className="text-xl font-bold text-sky-600">せってい</h2>
+                                <div className="w-10"></div>
+                            </div>
+                            <div className="bg-white p-5 rounded-[32px] shadow-sm mb-6">
+                                <input type="text" value={newTaskText} onChange={e => setNewTaskText(e.target.value)} placeholder="なにをする？" className="w-full p-4 rounded-2xl bg-slate-50 mb-4 outline-none border-2 border-transparent focus:border-sky-300" />
+                                <div className="flex gap-2 overflow-x-auto mb-4 scrollbar-hide pb-2">
+                                    {iconOptions.map(icon => <button key={icon} onClick={() => setNewTaskIcon(icon)} className={`text-2xl p-3 rounded-2xl ${newTaskIcon === icon ? 'bg-sky-100 ring-2 ring-sky-300' : 'bg-slate-50'}`}>{icon}</button>)}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => addTask('morning')} className="flex-1 py-4 bg-sky-400 text-white font-bold rounded-2xl">あさに追加</button>
+                                    <button onClick={() => addTask('evening')} className="flex-1 py-4 bg-purple-400 text-white font-bold rounded-2xl">よるに追加</button>
+                                </div>
+                            </div>
+                            <div className="space-y-3">
+                                {tasks.map(t => (
+                                    <div key={t.id} className="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-sm">
+                                        <span className="text-2xl">{t.icon}</span>
+                                        <span className="flex-1 font-bold text-slate-600">{t.text} <span className="text-[10px] text-slate-300">({t.time === 'morning' ? 'あさ' : 'よる'})</span></span>
+                                        <button onClick={() => deleteTask(t.id)} className="text-red-400 p-2"><i data-lucide="trash-2"></i></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
                         <div className="pb-24">
                             <div className={`p-4 shadow-lg sticky top-0 z-10 rounded-b-[40px] transition-colors safe-area-top ${activeTab === 'morning' ? 'bg-sky-400' : 'bg-purple-400'}`}>
                                 <div className="flex justify-between items-center text-white mb-3">
-                                    <h1 className="text-xl font-bold">おしたくスター</h1>
+                                    <h1 className="text-xl font-bold flex items-center gap-2"><i data-lucide="star" className="fill-yellow-300 text-yellow-300"></i>おしたくスター</h1>
                                     <div className="flex gap-2">
-                                        <button onClick={() => setView('stats')} className="p-2 rounded-full bg-white/20"><i data-lucide="trophy"></i></button>
+                                        <button onClick={() => setView('stats')} className="p-2 bg-white/20 rounded-full"><i data-lucide="trophy"></i></button>
+                                        <button onClick={() => setView('edit')} className="p-2 bg-white/20 rounded-full"><i data-lucide="settings"></i></button>
                                     </div>
                                 </div>
-                                <div className="bg-white/30 rounded-full h-4 overflow-hidden"><div className="bg-yellow-300 h-full transition-all duration-700" style={{ width: `${progress}%` }} /></div>
+                                <div className="bg-white/30 rounded-full h-4 overflow-hidden border border-white/10"><div className="bg-yellow-300 h-full transition-all duration-700" style={{ width: `${progress}%` }} /></div>
                             </div>
 
-                            <div className="flex gap-4 my-4 px-6">
-                                <button onClick={() => setActiveTab('morning')} className={`flex-1 py-4 rounded-3xl border-2 transition-all ${activeTab === 'morning' ? 'bg-sky-50 border-sky-400 text-sky-600 font-bold' : 'bg-white border-transparent text-slate-300'}`}>あさ</button>
-                                <button onClick={() => setActiveTab('evening')} className={`flex-1 py-4 rounded-3xl border-2 transition-all ${activeTab === 'evening' ? 'bg-purple-50 border-purple-400 text-purple-600 font-bold' : 'bg-white border-transparent text-slate-300'}`}>よる</button>
+                            <div className="flex gap-4 my-6 px-6">
+                                <button onClick={() => setActiveTab('morning')} className={`flex-1 py-4 rounded-3xl border-2 transition-all ${activeTab === 'morning' ? 'bg-sky-50 border-sky-400 text-sky-600 font-bold scale-105 shadow-sm' : 'bg-white border-transparent text-slate-300'}`}>あさ</button>
+                                <button onClick={() => setActiveTab('evening')} className={`flex-1 py-4 rounded-3xl border-2 transition-all ${activeTab === 'evening' ? 'bg-purple-50 border-purple-400 text-purple-600 font-bold scale-105 shadow-sm' : 'bg-white border-transparent text-slate-300'}`}>よる</button>
                             </div>
 
-                            <div className="px-4 space-y-4">
+                            <div className="px-4 space-y-4 max-w-md mx-auto">
                                 {currentList.map(task => (
                                     <div key={task.id} onClick={() => toggleTask(task.id)} className={`p-5 rounded-[32px] flex items-center gap-4 bg-white shadow-sm border-b-4 border-slate-200 active:scale-95 transition-all ${task.done ? 'opacity-60 bg-green-50' : ''}`}>
-                                        <div className="text-4xl">{task.icon}</div>
-                                        <div className={`flex-1 font-bold text-lg ${task.done ? 'line-through text-green-700' : ''}`}>{task.text}</div>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${task.done ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-200'}`}>
-                                            {task.done && <i data-lucide="check" className="w-6 h-6 stroke-[4]"></i>}
+                                        <div className="text-4xl bg-slate-50 w-14 h-14 rounded-2xl flex items-center justify-center">{task.icon}</div>
+                                        <div className={`flex-1 font-bold text-lg ${task.done ? 'line-through text-green-700' : 'text-slate-700'}`}>{task.text}</div>
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${task.done ? 'bg-green-500 text-white shadow-lg' : 'bg-slate-100 text-slate-200'}`}>
+                                            {task.done ? <i data-lucide="check" className="w-7 h-7 stroke-[4]"></i> : <i data-lucide="circle"></i>}
                                         </div>
                                     </div>
                                 ))}
@@ -197,22 +242,16 @@
                         </div>
                     )}
 
-                    {/* 過去入力用モーダル */}
+                    {/* モーダル類 */}
                     {editingDate && (
                         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm" onClick={() => setEditingDate(null)}>
-                            <div className="bg-white w-full max-w-xs p-6 rounded-[40px] animate-pop shadow-2xl" onClick={e => e.stopPropagation()}>
-                                <h3 className="text-center font-bold text-slate-600 mb-6">{editingDate.day}にち の おしたく</h3>
+                            <div className="bg-white w-full max-w-xs p-6 rounded-[40px] animate-pop text-center" onClick={e => e.stopPropagation()}>
+                                <h3 className="font-bold text-slate-600 mb-6">{editingDate.day}にち の記録</h3>
                                 <div className="space-y-3">
-                                    <button onClick={() => updateHistoryManually(editingDate.dateStr, 100)} className="w-full py-4 bg-orange-50 text-orange-600 font-bold rounded-2xl border-2 border-orange-200 flex items-center justify-center gap-2">
-                                        <span className="text-2xl">💮</span> ぜんぶ できた！
-                                    </button>
-                                    <button onClick={() => updateHistoryManually(editingDate.dateStr, 50)} className="w-full py-4 bg-green-50 text-green-600 font-bold rounded-2xl border-2 border-green-200 flex items-center justify-center gap-2">
-                                        <span className="text-lg">●</span> はんぶん できた
-                                    </button>
-                                    <button onClick={() => updateHistoryManually(editingDate.dateStr, 0)} className="w-full py-4 bg-slate-50 text-slate-400 font-bold rounded-2xl border-2 border-slate-200">
-                                        まだ / やっていない
-                                    </button>
-                                    <button onClick={() => setEditingDate(null)} className="w-full py-3 text-slate-400 text-sm mt-2">もどる</button>
+                                    <button onClick={() => updateHistoryManually(editingDate.dStr, 100)} className="w-full py-4 bg-orange-50 text-orange-600 font-bold rounded-2xl border-2 border-orange-200">💮 ぜんぶ できた！</button>
+                                    <button onClick={() => updateHistoryManually(editingDate.dStr, 50)} className="w-full py-4 bg-green-50 text-green-600 font-bold rounded-2xl border-2 border-green-200">● はんぶん できた</button>
+                                    <button onClick={() => updateHistoryManually(editingDate.dStr, 0)} className="w-full py-4 bg-slate-50 text-slate-400 font-bold rounded-2xl">まだ / クリア</button>
+                                    <button onClick={() => setEditingDate(null)} className="w-full py-3 text-slate-400 text-sm">もどる</button>
                                 </div>
                             </div>
                         </div>
@@ -220,10 +259,11 @@
 
                     {showConfetti && (
                         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6" onClick={() => setShowConfetti(false)}>
-                            <div className="bg-white w-full max-w-xs p-8 rounded-[50px] text-center animate-pop">
-                                <h2 className="text-3xl font-black text-sky-600 mb-4">💮 はなまる！</h2>
-                                <p className="font-bold text-slate-500 mb-6">ぜんぶ できたね！</p>
-                                <button onClick={() => setShowConfetti(false)} className="w-full bg-yellow-400 text-white font-black py-4 rounded-2xl">やったー！</button>
+                            <div className="bg-white w-full max-w-xs p-10 rounded-[50px] text-center animate-pop shadow-2xl">
+                                <div className="text-6xl mb-4">💮</div>
+                                <h2 className="text-3xl font-black text-sky-600 mb-2">すごーい！</h2>
+                                <p className="font-bold text-slate-500 mb-8">ぜんぶ できたね！</p>
+                                <button onClick={() => setShowConfetti(false)} className="w-full bg-yellow-400 text-white font-black py-4 rounded-2xl shadow-lg">やったー！</button>
                             </div>
                         </div>
                     )}
