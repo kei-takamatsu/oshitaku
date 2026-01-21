@@ -50,6 +50,13 @@
                 { id: 'e6', text: 'あしたのようい', icon: '🎒', time: 'evening', done: false },
             ];
 
+            // 日付表示用の関数
+            const getDisplayDate = () => {
+                const now = new Date();
+                const days = ['にち', 'げつ', 'か', 'すい', 'もく', 'きん', 'ど'];
+                return `${now.getMonth() + 1}がつ ${now.getDate()}にち (${days[now.getDay()]})`;
+            };
+
             const getTodayStr = () => new Date().toDateString();
             const getTodayKey = () => {
                 const now = new Date();
@@ -61,10 +68,10 @@
             }, []);
 
             useEffect(() => {
-                const savedTasks = localStorage.getItem('pocoTasksV10');
-                const savedHistory = localStorage.getItem('pocoHistoryV10');
-                const savedName = localStorage.getItem('pocoNameV10');
-                const savedDate = localStorage.getItem('pocoDateV10');
+                const savedTasks = localStorage.getItem('pocoTasksV11');
+                const savedHistory = localStorage.getItem('pocoHistoryV11');
+                const savedName = localStorage.getItem('pocoNameV11');
+                const savedDate = localStorage.getItem('pocoDateV11');
                 const todayStr = getTodayStr();
 
                 if (savedTasks) {
@@ -77,18 +84,18 @@
                 if (savedHistory) setHistory(JSON.parse(savedHistory));
                 if (savedName) setUserName(savedName);
                 
-                localStorage.setItem('pocoDateV10', todayStr);
+                localStorage.setItem('pocoDateV11', todayStr);
                 setActiveTab(getProperTab());
             }, []);
 
             const refreshAppState = useCallback(() => {
                 const todayStr = getTodayStr();
-                const savedDate = localStorage.getItem('pocoDateV10');
+                const savedDate = localStorage.getItem('pocoDateV11');
                 const targetTab = getProperTab();
 
                 if (savedDate !== todayStr) {
                     setTasks(prev => prev.map(t => ({ ...t, done: false })));
-                    localStorage.setItem('pocoDateV10', todayStr);
+                    localStorage.setItem('pocoDateV11', todayStr);
                 }
                 setActiveTab(prev => (prev !== targetTab ? targetTab : prev));
             }, [getProperTab]);
@@ -104,17 +111,17 @@
 
             useEffect(() => {
                 if (tasks.length > 0) {
-                    localStorage.setItem('pocoTasksV10', JSON.stringify(tasks));
+                    localStorage.setItem('pocoTasksV11', JSON.stringify(tasks));
                     const done = tasks.filter(t => t.done).length;
                     const percent = Math.round((done / tasks.length) * 100);
                     const newHistory = { ...history, [getTodayKey()]: percent };
                     setHistory(newHistory);
-                    localStorage.setItem('pocoHistoryV10', JSON.stringify(newHistory));
+                    localStorage.setItem('pocoHistoryV11', JSON.stringify(newHistory));
                 }
             }, [tasks]);
 
             useEffect(() => {
-                if (userName) localStorage.setItem('pocoNameV10', userName);
+                if (userName) localStorage.setItem('pocoNameV11', userName);
             }, [userName]);
 
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, activeTab, tasks, editingDate, userName]);
@@ -158,7 +165,7 @@
             const updateHistoryManually = (dateStr, percent) => {
                 setHistory(prev => {
                     const next = { ...prev, [dateStr]: percent };
-                    localStorage.setItem('pocoHistoryV10', JSON.stringify(next));
+                    localStorage.setItem('pocoHistoryV11', JSON.stringify(next));
                     return next;
                 });
                 setEditingDate(null);
@@ -265,11 +272,16 @@
                     ) : (
                         <div className="pb-24">
                             <div className={`p-4 shadow-lg sticky top-0 z-10 rounded-b-[40px] transition-colors safe-area-top ${activeTab === 'morning' ? 'bg-sky-400' : 'bg-purple-400'}`}>
-                                <div className="flex justify-between items-center text-white mb-3 px-1">
-                                    <h1 className="text-xl font-bold flex items-center gap-2">
-                                        <i data-lucide="star" className="fill-yellow-300 text-yellow-300 w-5 h-5"></i>
-                                        {userName ? `${userName}の ` : ''}おしたくポコ
-                                    </h1>
+                                <div className="flex justify-between items-start text-white mb-2 px-1">
+                                    <div className="flex flex-col">
+                                        <h1 className="text-xl font-bold flex items-center gap-2">
+                                            <i data-lucide="star" className="fill-yellow-300 text-yellow-300 w-5 h-5"></i>
+                                            {userName ? `${userName}の ` : ''}おしたくポコ
+                                        </h1>
+                                        <p className="text-sm font-bold bg-white/20 px-3 py-0.5 rounded-full mt-1 w-fit">
+                                            {getDisplayDate()}
+                                        </p>
+                                    </div>
                                     <div className="flex gap-2">
                                         <button onClick={() => setView('stats')} className="p-2 bg-white/20 rounded-full active:scale-90"><i data-lucide="trophy" className="w-5 h-5"></i></button>
                                         <button onClick={() => setView('edit')} className="p-2 bg-white/20 rounded-full active:scale-90"><i data-lucide="settings" className="w-5 h-5"></i></button>
