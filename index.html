@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>おしたくスター</title>
+    <title>おしたくポコ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -27,6 +27,7 @@
         const App = () => {
             const [tasks, setTasks] = useState([]);
             const [history, setHistory] = useState({});
+            const [userName, setUserName] = useState('');
             const [activeTab, setActiveTab] = useState('morning');
             const [view, setView] = useState('main'); 
             const [showConfetti, setShowConfetti] = useState(false);
@@ -35,6 +36,19 @@
             const [newTaskIcon, setNewTaskIcon] = useState('✨');
 
             const iconOptions = ['✨', '💦', '🪥', '👕', '🚽', '🍚', '🧼', '🛁', '🛌', '📚', '🎒', '👟', '✏️', '🍎'];
+
+            const initialDefaultTasks = [
+                { id: 'm1', text: 'かおをあらう', icon: '💦', time: 'morning', done: false },
+                { id: 'm2', text: 'はみがき', icon: '🪥', time: 'morning', done: false },
+                { id: 'm3', text: 'きがえ', icon: '👕', time: 'morning', done: false },
+                { id: 'm4', text: 'トイレ', icon: '🚽', time: 'morning', done: false },
+                { id: 'e1', text: 'てあらい・うがい', icon: '🧼', time: 'evening', done: false },
+                { id: 'e2', text: 'おふろ', icon: '🛁', time: 'evening', done: false },
+                { id: 'e3', text: 'はみがき', icon: '🪥', time: 'evening', done: false },
+                { id: 'e4', text: 'トイレ', icon: '🚽', time: 'evening', done: false },
+                { id: 'e5', text: 'しゅくだい', icon: '📚', time: 'evening', done: false },
+                { id: 'e6', text: 'あしたのようい', icon: '🎒', time: 'evening', done: false },
+            ];
 
             const getTodayStr = () => new Date().toDateString();
             const getTodayKey = () => {
@@ -47,35 +61,34 @@
             }, []);
 
             useEffect(() => {
-                const savedTasks = localStorage.getItem('kidsTasksV8');
-                const savedHistory = localStorage.getItem('kidsHistoryV8');
-                const savedDate = localStorage.getItem('taskDateV8');
+                const savedTasks = localStorage.getItem('pocoTasksV10');
+                const savedHistory = localStorage.getItem('pocoHistoryV10');
+                const savedName = localStorage.getItem('pocoNameV10');
+                const savedDate = localStorage.getItem('pocoDateV10');
                 const todayStr = getTodayStr();
 
                 if (savedTasks) {
                     const parsed = JSON.parse(savedTasks);
                     setTasks(savedDate !== todayStr ? parsed.map(t => ({ ...t, done: false })) : parsed);
                 } else {
-                    setTasks([
-                        { id: '1', text: 'かおをあらう', icon: '💦', time: 'morning', done: false },
-                        { id: '2', text: 'はみがき', icon: '🪥', time: 'morning', done: false },
-                        { id: '3', text: 'おふろ', icon: '🛁', time: 'evening', done: false },
-                        { id: '4', text: 'しゅくだい', icon: '📚', time: 'evening', done: false }
-                    ]);
+                    setTasks(initialDefaultTasks);
                 }
+                
                 if (savedHistory) setHistory(JSON.parse(savedHistory));
-                localStorage.setItem('taskDateV8', todayStr);
+                if (savedName) setUserName(savedName);
+                
+                localStorage.setItem('pocoDateV10', todayStr);
                 setActiveTab(getProperTab());
             }, []);
 
             const refreshAppState = useCallback(() => {
                 const todayStr = getTodayStr();
-                const savedDate = localStorage.getItem('taskDateV8');
+                const savedDate = localStorage.getItem('pocoDateV10');
                 const targetTab = getProperTab();
 
                 if (savedDate !== todayStr) {
                     setTasks(prev => prev.map(t => ({ ...t, done: false })));
-                    localStorage.setItem('taskDateV8', todayStr);
+                    localStorage.setItem('pocoDateV10', todayStr);
                 }
                 setActiveTab(prev => (prev !== targetTab ? targetTab : prev));
             }, [getProperTab]);
@@ -91,16 +104,20 @@
 
             useEffect(() => {
                 if (tasks.length > 0) {
-                    localStorage.setItem('kidsTasksV8', JSON.stringify(tasks));
+                    localStorage.setItem('pocoTasksV10', JSON.stringify(tasks));
                     const done = tasks.filter(t => t.done).length;
                     const percent = Math.round((done / tasks.length) * 100);
                     const newHistory = { ...history, [getTodayKey()]: percent };
                     setHistory(newHistory);
-                    localStorage.setItem('kidsHistoryV8', JSON.stringify(newHistory));
+                    localStorage.setItem('pocoHistoryV10', JSON.stringify(newHistory));
                 }
             }, [tasks]);
 
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, activeTab, tasks, editingDate]);
+            useEffect(() => {
+                if (userName) localStorage.setItem('pocoNameV10', userName);
+            }, [userName]);
+
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, activeTab, tasks, editingDate, userName]);
 
             const stats = useMemo(() => {
                 const now = new Date();
@@ -109,6 +126,7 @@
                 const monthHistory = Object.entries(history).filter(([key]) => key.startsWith(`${currentYear}-${String(currentMonth).padStart(2, '0')}`));
                 const completedDays = monthHistory.filter(([_, val]) => val === 100).length;
                 const avgPercent = monthHistory.length > 0 ? Math.round(monthHistory.reduce((s, [_, v]) => s + v, 0) / monthHistory.length) : 0;
+                
                 const fiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
                 const chartData = [];
                 for (let i = 0; i < 12; i++) {
@@ -140,7 +158,7 @@
             const updateHistoryManually = (dateStr, percent) => {
                 setHistory(prev => {
                     const next = { ...prev, [dateStr]: percent };
-                    localStorage.setItem('kidsHistoryV8', JSON.stringify(next));
+                    localStorage.setItem('pocoHistoryV10', JSON.stringify(next));
                     return next;
                 });
                 setEditingDate(null);
@@ -158,9 +176,9 @@
 
                 return (
                     <div className="p-4 space-y-6 animate-pop pb-24">
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center px-2">
                             <button onClick={() => setView('main')} className="p-2 bg-white rounded-full shadow-md"><i data-lucide="chevron-left"></i></button>
-                            <h2 className="text-xl font-bold text-purple-600 tracking-tighter">がんばりひょう</h2>
+                            <h2 className="text-xl font-bold text-purple-600">がんばりひょう</h2>
                             <div className="w-10"></div>
                         </div>
 
@@ -216,7 +234,14 @@
                                 <h2 className="text-xl font-bold text-sky-600">せってい</h2>
                                 <div className="w-10"></div>
                             </div>
+                            
+                            <div className="bg-white p-5 rounded-[32px] shadow-sm mb-6 border-b-4 border-yellow-100">
+                                <h3 className="text-sm font-bold text-slate-400 mb-3 flex items-center gap-1"><i data-lucide="user" className="w-4 h-4"></i> おなまえ</h3>
+                                <input type="text" value={userName} onChange={e => setUserName(e.target.value)} placeholder="おなまえを おしえてね" className="w-full p-4 rounded-2xl bg-slate-50 outline-none border-2 border-transparent focus:border-yellow-300 font-bold" />
+                            </div>
+
                             <div className="bg-white p-5 rounded-[32px] shadow-sm mb-6 border-b-4 border-sky-100">
+                                <h3 className="text-sm font-bold text-slate-400 mb-3 flex items-center gap-1"><i data-lucide="plus-circle" className="w-4 h-4"></i> あたらしい おしたく</h3>
                                 <input type="text" value={newTaskText} onChange={e => setNewTaskText(e.target.value)} placeholder="なにをする？" className="w-full p-4 rounded-2xl bg-slate-50 mb-4 outline-none border-2 border-transparent focus:border-sky-300 font-bold" />
                                 <div className="flex gap-2 overflow-x-auto mb-4 scrollbar-hide pb-2">
                                     {iconOptions.map(icon => <button key={icon} onClick={() => setNewTaskIcon(icon)} className={`text-2xl p-3 rounded-2xl ${newTaskIcon === icon ? 'bg-sky-100 ring-2 ring-sky-300' : 'bg-slate-50'}`}>{icon}</button>)}
@@ -226,6 +251,7 @@
                                     <button onClick={() => addTask('evening')} className="flex-1 py-4 bg-purple-400 text-white font-bold rounded-2xl shadow-md">よるについか</button>
                                 </div>
                             </div>
+
                             <div className="space-y-3">
                                 {tasks.map(t => (
                                     <div key={t.id} className="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border-b-2 border-slate-100">
@@ -240,7 +266,10 @@
                         <div className="pb-24">
                             <div className={`p-4 shadow-lg sticky top-0 z-10 rounded-b-[40px] transition-colors safe-area-top ${activeTab === 'morning' ? 'bg-sky-400' : 'bg-purple-400'}`}>
                                 <div className="flex justify-between items-center text-white mb-3 px-1">
-                                    <h1 className="text-xl font-bold flex items-center gap-2"><i data-lucide="star" className="fill-yellow-300 text-yellow-300 w-5 h-5"></i>おしたくスター</h1>
+                                    <h1 className="text-xl font-bold flex items-center gap-2">
+                                        <i data-lucide="star" className="fill-yellow-300 text-yellow-300 w-5 h-5"></i>
+                                        {userName ? `${userName}の ` : ''}おしたくポコ
+                                    </h1>
                                     <div className="flex gap-2">
                                         <button onClick={() => setView('stats')} className="p-2 bg-white/20 rounded-full active:scale-90"><i data-lucide="trophy" className="w-5 h-5"></i></button>
                                         <button onClick={() => setView('edit')} className="p-2 bg-white/20 rounded-full active:scale-90"><i data-lucide="settings" className="w-5 h-5"></i></button>
@@ -289,7 +318,7 @@
                             <div className="bg-white w-full max-w-xs p-10 rounded-[50px] text-center animate-pop shadow-2xl">
                                 <div className="text-7xl mb-6">💮</div>
                                 <h2 className="text-4xl font-black text-sky-600 mb-2">すごーい！</h2>
-                                <p className="font-bold text-slate-500 mb-8 leading-relaxed">ぜんぶ できたね！<br/>とっても えらいぞ！</p>
+                                <p className="font-bold text-slate-500 mb-8 leading-relaxed">{userName ? `${userName}、` : ''}ぜんぶ できたね！<br/>とっても えらいぞ！</p>
                                 <button onClick={() => setShowConfetti(false)} className="w-full bg-yellow-400 hover:bg-yellow-500 text-white font-black py-5 rounded-[25px] shadow-lg active:scale-95 transition-all text-xl">やったー！</button>
                             </div>
                         </div>
